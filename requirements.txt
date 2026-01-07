@@ -1,0 +1,11 @@
+numpy<2.0.0
+torch
+torchvision
+torchaudio
+diffusers
+transformers
+accelerate
+pillow
+opencv-python
+streamlit
+protobuf<=3.20
