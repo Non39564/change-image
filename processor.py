@@ -130,9 +130,25 @@ def generate_image(pipe, init_image, mask_image, prompt, negative_prompt,
     """
     Generates the inpainted image.
     """
-    # Ensure images are resized to 1024x1024 as in original script (SDXL prefers 1024x1024)
-    init_image = init_image.convert("RGB")
-    mask_image = mask_image.convert("L")
+    # Memory optimization
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # Get pipeline type to decide resolution
+    is_sdxl = isinstance(pipe, StableDiffusionXLInpaintPipeline)
+    target_size = (1024, 1024) if is_sdxl else (512, 512)
+
+    # Resize images to target size for processing
+    # Save original size to resize back later if needed
+    original_size = init_image.size
+    
+    init_image = init_image.resize(target_size, Image.LANCZOS).convert("RGB")
+    mask_image = mask_image.resize(target_size, Image.NEAREST).convert("L")
+
+    # Lower inference steps for CPU execution to prevent timeouts
+    if pipe.device.type == "cpu":
+        num_inference_steps = min(num_inference_steps, 20)
 
     result = pipe(
         prompt=prompt,
@@ -141,8 +157,11 @@ def generate_image(pipe, init_image, mask_image, prompt, negative_prompt,
         mask_image=mask_image,
         strength=strength,
         guidance_scale=guidance_scale,
-        denoising_start=denoising_start,
         num_inference_steps=num_inference_steps
     ).images[0]
+    
+    # Optional: Resize back to original size? 
+    # For now, let's keep it at generation size to match quality expectation
+    # result = result.resize(original_size, Image.LANCZOS)
     
     return result
