@@ -109,6 +109,10 @@ def load_inpainting_model(model_id="runwayml/stable-diffusion-inpainting"):
                 use_safetensors=False
             )
 
+    # Disable Safety Checker to prevent black images on NSFW content
+    if hasattr(pipe, "safety_checker"):
+        pipe.safety_checker = None
+        
     # Optimization
     if device == "cuda":
         pipe.enable_model_cpu_offload()
