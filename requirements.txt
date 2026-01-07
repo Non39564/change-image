@@ -6,6 +6,6 @@ diffusers
 transformers
 accelerate
 pillow
-opencv-python
+opencv-python-headless
 streamlit
 protobuf<=3.20
