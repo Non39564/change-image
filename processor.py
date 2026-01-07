@@ -92,13 +92,22 @@ def load_inpainting_model(model_id="runwayml/stable-diffusion-inpainting"):
             low_cpu_mem_usage=True
         )
     except Exception as e:
-        # Fallback to standard loading if low_cpu_mem_usage fails or other error
-        print(f"Error loading with optimization: {e}. Trying standard load.")
-        pipe = PipelineClass.from_pretrained(
-            model_id,
-            torch_dtype=dtype,
-            use_safetensors=True
-        )
+        # Fallback 1: Try standard load with safetensors (sometimes low_cpu_mem_usage fails specifically)
+        try:
+            print(f"Error loading with optimization: {e}. Trying standard load with safetensors.")
+            pipe = PipelineClass.from_pretrained(
+                model_id,
+                torch_dtype=dtype,
+                use_safetensors=True
+            )
+        except Exception as e2:
+            # Fallback 2: Try without safetensors (some older models only have .bin for fp32)
+            print(f"Error loading with safetensors: {e2}. Trying without safetensors.")
+            pipe = PipelineClass.from_pretrained(
+                model_id,
+                torch_dtype=dtype,
+                use_safetensors=False
+            )
 
     # Optimization
     if device == "cuda":
