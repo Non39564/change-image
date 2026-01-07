@@ -126,7 +126,7 @@ def load_inpainting_model(model_id="runwayml/stable-diffusion-inpainting"):
     return pipe
 
 def generate_image(pipe, init_image, mask_image, prompt, negative_prompt, 
-                   strength=0.35, guidance_scale=8.5, denoising_start=0.2, num_inference_steps=35):
+                   strength=0.99, guidance_scale=8.5, num_inference_steps=35, callback=None):
     """
     Generates the inpainted image.
     """
@@ -150,6 +150,14 @@ def generate_image(pipe, init_image, mask_image, prompt, negative_prompt,
     if pipe.device.type == "cpu":
         num_inference_steps = min(num_inference_steps, 20)
 
+    # Define callback wrapper for diffusers
+    # Diffusers callbacks receive (step, timestep, latents)
+    def callback_wrapper(step, timestep, latents):
+        if callback:
+            # Calculate progress 0.0 to 1.0
+            progress = (step + 1) / num_inference_steps
+            callback(progress)
+
     result = pipe(
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -157,7 +165,9 @@ def generate_image(pipe, init_image, mask_image, prompt, negative_prompt,
         mask_image=mask_image,
         strength=strength,
         guidance_scale=guidance_scale,
-        num_inference_steps=num_inference_steps
+        num_inference_steps=num_inference_steps,
+        callback=callback_wrapper,
+        callback_steps=1
     ).images[0]
     
     # Optional: Resize back to original size? 

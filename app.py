@@ -68,12 +68,19 @@ if uploaded_file is not None:
 
     # Advanced parameters
     with st.expander("Advanced Parameters"):
-        strength = st.slider("Strength", 0.0, 1.0, 0.35, 0.01, help="How much to transform the masked area. Higher = more destruction of original.")
+        strength = st.slider("Strength", 0.0, 1.0, 0.99, 0.01, help="Higher strength means more replacement of the original image area.")
         guidance_scale = st.slider("Guidance Scale", 1.0, 20.0, 8.5, 0.1)
-        denoising_start = st.slider("Denoising Start", 0.0, 1.0, 0.2, 0.01, help="Start denoising later in the process. Specific SDXL trick.")
+        # denoising_start is SDXL specific and not used effectively in standard pipeline fallback
+        # denoising_start = st.slider("Denoising Start", 0.0, 1.0, 0.2, 0.01) 
         num_inference_steps = st.slider("Steps", 10, 100, 35, 1)
 
     if st.button("Generate", type="primary"):
+        # Progress bar
+        progress_bar = st.progress(0)
+        
+        def update_progress(progress):
+            progress_bar.progress(progress)
+
         with st.spinner("Generating..."):
             try:
                 result = processor.generate_image(
@@ -84,9 +91,12 @@ if uploaded_file is not None:
                     negative_prompt,
                     strength=strength,
                     guidance_scale=guidance_scale,
-                    denoising_start=denoising_start,
-                    num_inference_steps=num_inference_steps
+                    num_inference_steps=num_inference_steps,
+                    callback=update_progress
                 )
+                
+                # Clear progress bar on completion
+                progress_bar.empty()
                 
                 st.subheader("Result")
                 st.image(result, use_container_width=True)
