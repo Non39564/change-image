@@ -60,37 +60,60 @@ def create_clothing_mask(img_pil, segmentation_pipeline=None):
     mask_img = Image.fromarray(mask, mode="L")
     return mask_img
 
-def load_inpainting_model(model_id="andro-flock/LUSTIFY-SDXL-NSFW-checkpoint-v2-0-INPAINTING"):
+def load_inpainting_model(model_id="runwayml/stable-diffusion-inpainting"):
     """
-    Loads the Stable Diffusion XL Inpainting pipeline.
+    Loads the Inpainting pipeline.
     Should be cached by Streamlit.
     """
     # Memory cleanup
     gc.collect()
-    torch.cuda.empty_cache()
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
-    # Check device availability
+    
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # Use float16 for GPU, float32 for CPU (MPS/Mac could also use float16 usually, but let's be safe)
     dtype = torch.float16 if device == "cuda" else torch.float32
 
-    pipe = StableDiffusionXLInpaintPipeline.from_pretrained(
-        model_id,
-        torch_dtype=dtype,
-        use_safetensors=True
-    )
+    if device == "cuda":
+        torch.cuda.empty_cache()
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    
+    # Load pipeline
+    from diffusers import StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline
+
+    # Determine which pipeline class to use based on model ID
+    if "sxed" in model_id.lower() or "xl" in model_id.lower():
+        PipelineClass = StableDiffusionXLInpaintPipeline
+    else:
+        PipelineClass = StableDiffusionInpaintPipeline
+
+    try:
+        pipe = PipelineClass.from_pretrained(
+            model_id,
+            torch_dtype=dtype,
+            use_safetensors=True,
+            low_cpu_mem_usage=True
+        )
+    except Exception as e:
+        # Fallback to standard loading if low_cpu_mem_usage fails or other error
+        print(f"Error loading with optimization: {e}. Trying standard load.")
+        pipe = PipelineClass.from_pretrained(
+            model_id,
+            torch_dtype=dtype,
+            use_safetensors=True
+        )
 
     # Optimization
     if device == "cuda":
         pipe.enable_model_cpu_offload()
         pipe.enable_vae_slicing()
-        pipe.enable_attention_slicing("max")
+        if hasattr(pipe, "enable_attention_slicing"):
+            pipe.enable_attention_slicing("max")
     else:
-        # On CPU, just move the pipeline to CPU explicitly or leave it
-        # Generating on CPU will be slow
+        # On CPU, ensure it is on CPU
         pipe.to("cpu")
-    
+        # Optimization for CPU execution (saves memory)
+        pipe.enable_vae_slicing()
+        if hasattr(pipe, "enable_attention_slicing"):
+            pipe.enable_attention_slicing("max")
+
     return pipe
 
 def generate_image(pipe, init_image, mask_image, prompt, negative_prompt, 
@@ -99,8 +122,8 @@ def generate_image(pipe, init_image, mask_image, prompt, negative_prompt,
     Generates the inpainted image.
     """
     # Ensure images are resized to 1024x1024 as in original script (SDXL prefers 1024x1024)
-    init_image = init_image.convert("RGB").resize((1024,1024))
-    mask_image = mask_image.convert("L").resize((1024,1024))
+    init_image = init_image.convert("RGB")
+    mask_image = mask_image.convert("L")
 
     result = pipe(
         prompt=prompt,

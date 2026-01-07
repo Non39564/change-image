@@ -8,7 +8,9 @@ st.title("AI Inpainting Tool")
 
 # Sidebar for settings
 st.sidebar.header("Settings")
-model_id = st.sidebar.text_input("Model ID", "andro-flock/LUSTIFY-SDXL-NSFW-checkpoint-v2-0-INPAINTING")
+# Default to a smaller model for CPU compatibility. 
+# Users can change this to "andro-flock/LUSTIFY-SDXL-NSFW-checkpoint-v2-0-INPAINTING" if they have powerful hardware.
+model_id = st.sidebar.text_input("Model ID", "runwayml/stable-diffusion-inpainting")
 
 # Cache the model loading to prevent reloading on every interaction
 @st.cache_resource
